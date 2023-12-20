@@ -1,0 +1,9 @@
+name: Push to non-release branch
+
+on:
+  push:
+    branches-ignore: master
+
+jobs:
+  lua:
+    uses: "./.github/workflows/lua.yml"
