@@ -9,7 +9,7 @@ jobs:
     uses: "./.github/workflows/lua.yml"
 
   deploy:
-    runs-on: ubuntu:latest
+    runs-on: ubuntu-latest
     # TODO: Re-enable this once the whole codebase passes the formatter and linter
     #needs: [lua]
 
