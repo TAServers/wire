@@ -1834,6 +1834,7 @@ local CompileVisitors = {
 					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			end
 		elseif fn_data.attrs["legacy"] then -- Not a user function. Can get function to call at compile time.
+			self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 2) + 1
 			local fn, largs = fn_data.op, { [1] = {}, [nargs + 2] = types }
 			for i = 1, nargs do
 				largs[i + 1] = { [1] = args[i] }
@@ -1843,6 +1844,7 @@ local CompileVisitors = {
 			end,
 				fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 		else
+			self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 2)
 			local fn = fn_data.op
 			return function(state) ---@param state RuntimeContext
 				local rargs = {}
@@ -1892,6 +1894,8 @@ local CompileVisitors = {
 			and self.user_methods[meta_type][name.value][arg_sig]
 		if user_method then
 			if self.strict then -- If @strict, functions are compile time constructs (like events).
+				self.scope.data.ops = self.scope.data.ops + fn_data.cost
+
 				local fn = user_method.op
 				return function(state)
 					local rargs = { meta(state) }
@@ -1902,6 +1906,8 @@ local CompileVisitors = {
 				end,
 					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			else
+				self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 15) + (fn_data.attrs["legacy"] and 10 or 0)
+
 				local full_sig = name.value .. "(" .. meta_type .. ":" .. arg_sig .. ")"
 				return function(state) ---@param state RuntimeContext
 					local rargs = { meta(state) }
@@ -1919,6 +1925,8 @@ local CompileVisitors = {
 					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			end
 		elseif fn_data.attrs["legacy"] then
+			self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 2) + 1
+
 			local fn, largs = fn_data.op, { [nargs + 3] = types, [2] = { [1] = meta } }
 			for k = 1, nargs do
 				largs[k + 2] = { [1] = args[k] }
@@ -1928,6 +1936,8 @@ local CompileVisitors = {
 				return fn(state, largs)
 			end, fn_data.ret
 		else
+			self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 2)
+
 			local fn = fn_data.op
 			return function(state) ---@param state RuntimeContext
 				local rargs = { meta(state) }
