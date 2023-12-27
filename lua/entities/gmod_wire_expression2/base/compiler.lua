@@ -93,8 +93,13 @@ E2Lib.Compiler = Compiler
 function Compiler.new()
 	local global_scope = Scope.new()
 	return setmetatable({
-		global_scope = global_scope, scope = global_scope, warnings = {}, registered_events = {},
-		user_functions = {}, user_methods = {}, delta_vars = {}
+		global_scope = global_scope,
+		scope = global_scope,
+		warnings = {},
+		registered_events = {},
+		user_functions = {},
+		user_methods = {},
+		delta_vars = {},
 	}, Compiler)
 end
 
@@ -104,9 +109,18 @@ end
 function Compiler.from(directives, dvars, includes)
 	local global_scope = Scope.new()
 	return setmetatable({
-		persist = directives.persist, inputs = directives.inputs, outputs = directives.outputs, strict = directives.strict,
-		global_scope = global_scope, scope = global_scope, warnings = {}, registered_events = {}, user_functions = {}, user_methods = {},
-		delta_vars = dvars or {}, includes = includes or {}
+		persist = directives.persist,
+		inputs = directives.inputs,
+		outputs = directives.outputs,
+		strict = directives.strict,
+		global_scope = global_scope,
+		scope = global_scope,
+		warnings = {},
+		registered_events = {},
+		user_functions = {},
+		user_methods = {},
+		delta_vars = dvars or {},
+		includes = includes or {},
 	}, Compiler)
 end
 
@@ -127,7 +141,7 @@ end
 ---@param trace Trace
 ---@param quick_fix { replace: string, at: Trace }[]?
 function Compiler:Error(message, trace, quick_fix)
-	error( Error.new(message, trace, nil, quick_fix), 0)
+	error(Error.new(message, trace, nil, quick_fix), 0)
 end
 
 ---@generic T
@@ -136,7 +150,9 @@ end
 ---@param trace Trace
 ---@return T
 function Compiler:Assert(v, message, trace)
-	if not v then self:Error(message, trace) end
+	if not v then
+		self:Error(message, trace)
+	end
 	return v
 end
 
@@ -146,10 +162,11 @@ end
 ---@param trace Trace
 ---@return T
 function Compiler:AssertW(v, message, trace)
-	if not v then self:Warning(message, trace) end
+	if not v then
+		self:Warning(message, trace)
+	end
 	return v
 end
-
 
 ---@param message string
 ---@param trace Trace
@@ -192,8 +209,12 @@ end
 ---@param ty Token<string>
 ---@return string? type_id # Type id or nil if void
 function Compiler:CheckType(ty)
-	if ty.value == "number" then return "n" end
-	if ty.value == "void" then return end
+	if ty.value == "number" then
+		return "n"
+	end
+	if ty.value == "void" then
+		return
+	end
 	return self:Assert(wire_expression_types[ty.value:upper()], "Invalid type (" .. ty.value .. ")", ty.trace)[1]
 end
 
@@ -230,7 +251,12 @@ local CompileVisitors = {
 					local i = #stmts + 1
 					stmts[i], traces[i] = stmt, trace
 
-					if node:isExpr() and node.variant ~= NodeVariant.ExprDynCall and node.variant ~= NodeVariant.ExprCall and node.variant ~= NodeVariant.ExprMethodCall then
+					if
+						node:isExpr()
+						and node.variant ~= NodeVariant.ExprDynCall
+						and node.variant ~= NodeVariant.ExprCall
+						and node.variant ~= NodeVariant.ExprMethodCall
+					then
 						self:Warning("This expression has no effect", node.trace, { { replace = "", at = node.trace } })
 					end
 				end
@@ -252,29 +278,39 @@ local CompileVisitors = {
 		if self.scope:ResolveData("loop") or self.scope:ResolveData("switch_case") then -- Inside loop or switch case, check if continued or broken
 			return function(state) ---@param state RuntimeContext
 				state.prf = state.prf + cost
-				if state.prf > TickQuota then error("perf", 0) end
+				if state.prf > TickQuota then
+					error("perf", 0)
+				end
 
 				for i = 1, nstmts do
 					state.trace = traces[i]
 					stmts[i](state)
-					if state.__break__ or state.__return__ or state.__continue__ then break end
+					if state.__break__ or state.__return__ or state.__continue__ then
+						break
+					end
 				end
 			end
 		elseif self.scope:ResolveData("function") then -- If inside a function, check if returned.
 			return function(state) ---@param state RuntimeContext
 				state.prf = state.prf + cost
-				if state.prf > TickQuota then error("perf", 0) end
+				if state.prf > TickQuota then
+					error("perf", 0)
+				end
 
 				for i = 1, nstmts do
 					state.trace = traces[i]
 					stmts[i](state)
-					if state.__return__ then break end
+					if state.__return__ then
+						break
+					end
 				end
 			end
 		else -- Most optimized case, not inside a function or loop.
 			return function(state) ---@param state RuntimeContext
 				state.prf = state.prf + cost
-				if state.prf > TickQuota then error("perf", 0) end
+				if state.prf > TickQuota then
+					error("perf", 0)
+				end
 
 				for i = 1, nstmts do
 					state.trace = traces[i]
@@ -285,7 +321,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Node?, [2]: Node }[]
-	[NodeVariant.If] = function (self, trace, data)
+	[NodeVariant.If] = function(self, trace, data)
 		local chain = {} ---@type { [1]: RuntimeOperator?, [2]: RuntimeOperator }[]
 		local dead, els = true, false
 
@@ -297,7 +333,7 @@ local CompileVisitors = {
 					if expr_ty == "n" then -- Optimization: Don't need to run operator_is on number (since we already check if ~= 0 here.)
 						chain[i] = {
 							expr,
-							self:CompileStmt(ifeif[2])
+							self:CompileStmt(ifeif[2]),
 						}
 					else
 						local op = self:GetOperator("is", { expr_ty }, trace)
@@ -306,7 +342,7 @@ local CompileVisitors = {
 							function(state)
 								return op(state, expr(state))
 							end,
-							self:CompileStmt(ifeif[2])
+							self:CompileStmt(ifeif[2]),
 						}
 					end
 
@@ -393,8 +429,12 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Node, [3]: Node, [4]: Node?, [5]: Node } var start stop step block
-	[NodeVariant.For] = function (self, trace, data)
-		local var, start, stop, step = data[1], self:CompileExpr(data[2]), self:CompileExpr(data[3]), data[4] and self:CompileExpr(data[4]) or data[4]
+	[NodeVariant.For] = function(self, trace, data)
+		local var, start, stop, step =
+			data[1],
+			self:CompileExpr(data[2]),
+			self:CompileExpr(data[3]),
+			data[4] and self:CompileExpr(data[4]) or data[4]
 
 		local block = self:Scope(function(scope)
 			scope.data.loop = true
@@ -449,8 +489,9 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Token<string>?, [3]: Token<string>, [4]: Token<string>, [5]: Node, [6]: Node } key key_type value value_type iterator block
-	[NodeVariant.Foreach] = function (self, trace, data)
-		local key, key_type, value, value_type = data[1], data[2] and self:CheckType(data[2]), data[3], self:CheckType(data[4])
+	[NodeVariant.Foreach] = function(self, trace, data)
+		local key, key_type, value, value_type =
+			data[1], data[2] and self:CheckType(data[2]), data[3], self:CheckType(data[4])
 
 		local item, item_ty = self:CompileExpr(data[5])
 
@@ -526,7 +567,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Node, [2]: {[1]: Node, [2]: Node}[], [3]: Node? }
-	[NodeVariant.Switch] = function (self, trace, data)
+	[NodeVariant.Switch] = function(self, trace, data)
 		local expr, expr_ty = self:CompileExpr(data[1])
 		local dead = true
 
@@ -540,21 +581,22 @@ local CompileVisitors = {
 				return b
 			end)
 
-			local eq =  self:GetOperator("eq", { expr_ty, cond_ty }, case[1].trace)
+			local eq = self:GetOperator("eq", { expr_ty, cond_ty }, case[1].trace)
 			cases[i] = {
 				function(state, expr)
 					return eq(state, cond(state), expr)
 				end,
-				block
+				block,
 			}
 		end
 
-		local default = data[3] and self:Scope(function(scope)
-			scope.data.switch_case = true
-			local b = self:CompileStmt(data[3])
-			dead = dead and scope.data.dead == "ret"
-			return b
-		end)
+		local default = data[3]
+			and self:Scope(function(scope)
+				scope.data.switch_case = true
+				local b = self:CompileStmt(data[3])
+				dead = dead and scope.data.dead == "ret"
+				return b
+			end)
 
 		if dead and default then -- if all cases dead and has default case, mark scope as dead.
 			self.scope.data.dead = true
@@ -601,7 +643,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Node, [2]: Token<string>, [3]: Token<string>?, [4]: Node }
-	[NodeVariant.Try] = function (self, trace, data)
+	[NodeVariant.Try] = function(self, trace, data)
 		local try_block, catch_block, err_var, err_ty = nil, nil, data[2], data[3]
 		self:Scope(function(scope)
 			try_block = self:CompileStmt(data[1])
@@ -610,10 +652,14 @@ local CompileVisitors = {
 		if err_ty then
 			self:Assert(err_ty.value == "string", "Error type can only be string, for now", err_ty.trace)
 		else
-			self:Warning("You should explicitly annotate the error type as :string", err_var.trace, { { replace = err_var.value .. ":string", at = err_var.trace } })
+			self:Warning(
+				"You should explicitly annotate the error type as :string",
+				err_var.trace,
+				{ { replace = err_var.value .. ":string", at = err_var.trace } }
+			)
 		end
 
-		self:Scope(function (scope)
+		self:Scope(function(scope)
 			scope:DeclVar(err_var.value, { initialized = true, trace_if_unused = err_var.trace, type = "s" })
 			catch_block = self:CompileStmt(data[4])
 		end)
@@ -622,14 +668,14 @@ local CompileVisitors = {
 
 		return function(state) ---@param state RuntimeContext
 			state:PushScope()
-				local ok, err = pcall(try_block, state)
+			local ok, err = pcall(try_block, state)
 			state:PopScope()
 			if not ok then
 				local catchable, msg = E2Lib.unpackException(err)
 				if catchable then
 					state:PushScope()
-						state.Scope[err_var.value] = (type(msg) == "string") and msg or ""
-						catch_block(state)
+					state.Scope[err_var.value] = (type(msg) == "string") and msg or ""
+					catch_block(state)
 					state:PopScope()
 				else
 					error(err, 0)
@@ -639,7 +685,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Token<string>?, [3]: Token<string>, [4]: Parameter[], [5]: Node }
-	[NodeVariant.Function] = function (self, trace, data)
+	[NodeVariant.Function] = function(self, trace, data)
 		local name = data[3]
 
 		local return_type
@@ -657,9 +703,14 @@ local CompileVisitors = {
 			local existing = {}
 			for i, param in ipairs(data[4]) do
 				if param.type then
-					local t = self:Assert(self:CheckType(param.type), "Cannot use void as parameter type", param.name.trace)
+					local t =
+						self:Assert(self:CheckType(param.type), "Cannot use void as parameter type", param.name.trace)
 					if param.variadic then
-						self:Assert(t == "r" or t == "t", "Variadic parameter must be of type array or table", param.type.trace)
+						self:Assert(
+							t == "r" or t == "t",
+							"Variadic parameter must be of type array or table",
+							param.type.trace
+						)
 						variadic_ind, variadic_ty = i, t
 					end
 					param_types[i] = t
@@ -667,7 +718,11 @@ local CompileVisitors = {
 					self:Error("Variadic parameter requires explicit type", param.name.trace)
 				else
 					param_types[i] = "n"
-					self:Warning("Use of implicit parameter type is deprecated (add :number)", param.name.trace, { { replace = param.name.value .. ":number", at = param.name.trace } })
+					self:Warning(
+						"Use of implicit parameter type is deprecated (add :number)",
+						param.name.trace,
+						{ { replace = param.name.value .. ":number", at = param.name.trace } }
+					)
 				end
 
 				if param.name.value ~= "_" and existing[param.name.value] then
@@ -687,13 +742,25 @@ local CompileVisitors = {
 		if fn_data then
 			if not userfunction then
 				if not lookup_variadic or variadic_ind == 1 then -- Allow overrides like print(nnn) and print(n..r) to override print(...), but not print(...r)
-					self:Error("Cannot overwrite existing function: " .. (meta_type and (meta_type .. ":") or "") .. name.value .. "(" .. table.concat(fn_data.args, ", ") .. ")", name.trace)
+					self:Error(
+						"Cannot overwrite existing function: "
+							.. (meta_type and (meta_type .. ":") or "")
+							.. name.value
+							.. "("
+							.. table.concat(fn_data.args, ", ")
+							.. ")",
+						name.trace
+					)
 				end
 			else
 				if return_type then
 					self:Assert(fn_data.ret == return_type, "Cannot override with differing return type", trace)
 				else
-					self:Assert(fn_data.ret == nil, "Cannot override function returning void with differing return type", trace)
+					self:Assert(
+						fn_data.ret == nil,
+						"Cannot override function returning void with differing return type",
+						trace
+					)
 				end
 
 				if not self.strict then
@@ -704,8 +771,15 @@ local CompileVisitors = {
 			end
 		end
 
-		local fn = { args = param_types, ret = return_type, meta = meta_type, cost = variadic_ty and 10 or 5 + (self.strict and 0 or 3), attrs = {} }
-		local sig = table.concat(param_types, "", 1, #param_types - 1) .. ((variadic_ty and ".." or "") .. (param_types[#param_types] or ""))
+		local fn = {
+			args = param_types,
+			ret = return_type,
+			meta = meta_type,
+			cost = variadic_ty and 10 or 5 + (self.strict and 0 or 3),
+			attrs = {},
+		}
+		local sig = table.concat(param_types, "", 1, #param_types - 1)
+			.. ((variadic_ty and ".." or "") .. (param_types[#param_types] or ""))
 
 		if meta_type then
 			self.user_methods[meta_type] = self.user_methods[meta_type] or {}
@@ -715,7 +789,14 @@ local CompileVisitors = {
 			if variadic_ty then
 				local opposite = variadic_ty == "r" and "t" or "r"
 				if self.user_methods[meta_type][name.value][sig:gsub(".." .. variadic_ty, ".." .. opposite)] then
-					self:Error("Cannot override variadic " .. opposite .. " function with variadic " .. variadic_ty .. " function to avoid ambiguity.", trace)
+					self:Error(
+						"Cannot override variadic "
+							.. opposite
+							.. " function with variadic "
+							.. variadic_ty
+							.. " function to avoid ambiguity.",
+						trace
+					)
 				end
 			end
 
@@ -729,12 +810,18 @@ local CompileVisitors = {
 			if variadic_ty then
 				local opposite = variadic_ty == "r" and "t" or "r"
 				if self.user_functions[name.value][sig:gsub(".." .. variadic_ty, ".." .. opposite)] then
-					self:Error("Cannot override variadic " .. opposite .. " function with variadic " .. variadic_ty .. " function to avoid ambiguity.", trace)
+					self:Error(
+						"Cannot override variadic "
+							.. opposite
+							.. " function with variadic "
+							.. variadic_ty
+							.. " function to avoid ambiguity.",
+						trace
+					)
 				end
 			end
 			self.user_functions[name.value][sig] = fn
 		end
-
 
 		local block
 		if variadic_ty then
@@ -817,9 +904,12 @@ local CompileVisitors = {
 			end
 		end
 
-		self:IsolatedScope(function (scope)
+		self:IsolatedScope(function(scope)
 			for i, type in ipairs(param_types) do
-				scope:DeclVar(param_names[i], { type = type, trace_if_unused = data[4][i] and data[4][i].name.trace or trace, initialized = true })
+				scope:DeclVar(
+					param_names[i],
+					{ type = type, trace_if_unused = data[4][i] and data[4][i].name.trace or trace, initialized = true }
+				)
 			end
 
 			scope.data["function"] = { name.value, fn }
@@ -827,12 +917,26 @@ local CompileVisitors = {
 			block = self:CompileStmt(data[5])
 
 			if return_type then -- Ensure function either returns or errors
-				self:Assert(scope.data.dead, "This function marked to return '" .. data[1].value .. "' must return a value", data[1].trace)
+				self:Assert(
+					scope.data.dead,
+					"This function marked to return '" .. data[1].value .. "' must return a value",
+					data[1].trace
+				)
 			end
 		end)
 
 		if return_type then
-			self:Assert(fn.ret == return_type, "Function " .. name.value .. " expects to return type (" .. return_type .. ") but got type (" .. (fn.ret or "void") .. ")", trace)
+			self:Assert(
+				fn.ret == return_type,
+				"Function "
+					.. name.value
+					.. " expects to return type ("
+					.. return_type
+					.. ") but got type ("
+					.. (fn.ret or "void")
+					.. ")",
+				trace
+			)
 		else
 			return_type = fn.ret
 		end
@@ -849,7 +953,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data string
-	[NodeVariant.Include] = function (self, trace, data)
+	[NodeVariant.Include] = function(self, trace, data)
 		local include = self.includes[data]
 		self:Assert(include and include[1], "Problem including file '" .. data .. "'", trace)
 
@@ -870,7 +974,9 @@ local CompileVisitors = {
 
 			if not status then ---@cast script Error
 				local reason = script.message
-				if reason:find("C stack overflow") then reason = "Include depth too deep" end
+				if reason:find("C stack overflow") then
+					reason = "Include depth too deep"
+				end
 
 				if not self.IncludeError then
 					-- Otherwise Errors messages will be wrapped inside other error messages!
@@ -922,7 +1028,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data Node?
-	[NodeVariant.Return] = function (self, trace, data)
+	[NodeVariant.Return] = function(self, trace, data)
 		local fn = self.scope:ResolveData("function")
 		self:Assert(fn, "Cannot use `return` outside of a function", trace)
 
@@ -936,7 +1042,17 @@ local CompileVisitors = {
 		local name, fn = fn[1], fn[2]
 
 		if fn.ret then
-			self:Assert(fn.ret == ret_ty, "Function " .. name .. " expects return type (" .. (fn.ret or "void") .. ") but was given (" .. (ret_ty or "void") .. ")", trace)
+			self:Assert(
+				fn.ret == ret_ty,
+				"Function "
+					.. name
+					.. " expects return type ("
+					.. (fn.ret or "void")
+					.. ") but was given ("
+					.. (ret_ty or "void")
+					.. ")",
+				trace
+			)
 		else
 			fn.ret = ret_ty
 		end
@@ -953,14 +1069,18 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: boolean, [2]: { [1]: Token<string>, [2]: { [1]: Node, [2]: Token<string>?, [3]: Trace }[] }[], [3]: Node } is_local, vars, value
-	[NodeVariant.Assignment] = function (self, trace, data)
+	[NodeVariant.Assignment] = function(self, trace, data)
 		local value, value_ty = self:CompileExpr(data[3])
 
 		if data[1] then
 			-- Local declaration. Fastest case.
 			local var_name = data[2][1][1].value
 			self:AssertW(not self.scope.vars[var_name], "Do not redeclare existing variable " .. var_name, trace)
-			self:Assert(not self.scope.vars[var_name] or not self.scope.vars[var_name].const, "Cannot redeclare constant variable", trace)
+			self:Assert(
+				not self.scope.vars[var_name] or not self.scope.vars[var_name].const,
+				"Cannot redeclare constant variable",
+				trace
+			)
 
 			self.scope:DeclVar(var_name, { initialized = true, trace_if_unused = data[2][1][1].trace, type = value_ty })
 			return function(state) ---@param state RuntimeContext
@@ -1007,7 +1127,11 @@ local CompileVisitors = {
 					local op
 					if setter[2] then -- <EXPR>[<EXPR>, <type>]
 						local ty = self:CheckType(setter[2])
-						self:Assert(ty == value_ty, "Cannot assign type " .. value_ty .. " to object expecting " .. ty, trace)
+						self:Assert(
+							ty == value_ty,
+							"Cannot assign type " .. value_ty .. " to object expecting " .. ty,
+							trace
+						)
 						op, expr_ty = self:GetOperator("indexset", { expr_ty, key_ty, ty }, setter[3])
 					else -- <EXPR>[<EXPR>]
 						op, expr_ty = self:GetOperator("indexset", { expr_ty, key_ty, value_ty }, setter[3])
@@ -1018,7 +1142,11 @@ local CompileVisitors = {
 						op(state, handle(state), key(state), val)
 					end
 				else
-					self:Assert(existing.type == value_ty, "Cannot assign type (" .. value_ty .. ") to variable of type (" .. existing.type .. ")", trace)
+					self:Assert(
+						existing.type == value_ty,
+						"Cannot assign type (" .. value_ty .. ") to variable of type (" .. existing.type .. ")",
+						trace
+					)
 					self:Assert(not existing.const, "Cannot assign to constant variable " .. var, trace)
 					existing.initialized = true
 
@@ -1113,7 +1241,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Node }
-	[NodeVariant.Const] = function (self, trace, data)
+	[NodeVariant.Const] = function(self, trace, data)
 		local name, expr, expr_ty = data[1].value, self:CompileExpr(data[2])
 		self:Assert(not self.scope.vars[name], "Cannot redeclare existing variable " .. name, trace)
 		self.scope:DeclVar(name, { type = expr_ty, initialized = true, const = true, trace_if_unused = data[1].trace })
@@ -1124,41 +1252,25 @@ local CompileVisitors = {
 	end,
 
 	---@param data Token<string>
-	[NodeVariant.Increment] = function (self, trace, data)
+	[NodeVariant.Increment] = function(self, trace, data)
 		-- Transform V-- to V = V + 1
 		local one = Node.new(NodeVariant.ExprLiteral, { "n", 1 }, trace)
 		local var = Node.new(NodeVariant.ExprIdent, data, data.trace)
 
-		local result = Node.new(
-			NodeVariant.ExprArithmetic,
-			{ var, Operator.Add, one },
-			trace
-		)
+		local result = Node.new(NodeVariant.ExprArithmetic, { var, Operator.Add, one }, trace)
 
-		return self:CompileStmt(Node.new(
-			NodeVariant.Assignment,
-			{ false, { { data, {}, trace } }, result },
-			trace
-		))
+		return self:CompileStmt(Node.new(NodeVariant.Assignment, { false, { { data, {}, trace } }, result }, trace))
 	end,
 
 	---@param data Token<string>
-	[NodeVariant.Decrement] = function (self, trace, data)
+	[NodeVariant.Decrement] = function(self, trace, data)
 		-- Transform V-- to V = V - 1
 		local one = Node.new(NodeVariant.ExprLiteral, { "n", 1 }, trace)
 		local var = Node.new(NodeVariant.ExprIdent, data, data.trace)
 
-		local result = Node.new(
-			NodeVariant.ExprArithmetic,
-			{ var, Operator.Sub, one },
-			trace
-		)
+		local result = Node.new(NodeVariant.ExprArithmetic, { var, Operator.Sub, one }, trace)
 
-		return self:CompileStmt(Node.new(
-			NodeVariant.Assignment,
-			{ false, { { data, {}, trace } }, result },
-			trace
-		))
+		return self:CompileStmt(Node.new(NodeVariant.Assignment, { false, { { data, {}, trace } }, result }, trace))
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Operator, [3]: Node }
@@ -1170,11 +1282,7 @@ local CompileVisitors = {
 			trace
 		)
 
-		return self:CompileStmt(Node.new(
-			NodeVariant.Assignment,
-			{ false, { { data[1], {}, trace } }, result },
-			trace
-		))
+		return self:CompileStmt(Node.new(NodeVariant.Assignment, { false, { { data[1], {}, trace } }, result }, trace))
 	end,
 
 	---@param data { [1]: Node, [2]: Node }
@@ -1188,7 +1296,8 @@ local CompileVisitors = {
 		return function(state) ---@param state RuntimeContext
 			local iff = cond(state)
 			return op(state, iff) ~= 0 and iff or expr(state)
-		end, cond_ty
+		end,
+			cond_ty
 	end,
 
 	---@param data { [1]: Node, [2]: Node }
@@ -1202,11 +1311,12 @@ local CompileVisitors = {
 		local op = self:GetOperator("is", { cond_ty }, trace)
 		return function(state) ---@param state RuntimeContext
 			return op(state, cond(state)) ~= 0 and iff(state) or els(state)
-		end, iff_ty
+		end,
+			iff_ty
 	end,
 
 	---@param data { [1]: string, [2]: string|number|table }
-	[NodeVariant.ExprLiteral] = function (self, trace, data)
+	[NodeVariant.ExprLiteral] = function(self, trace, data)
 		local val = data[2]
 		self.scope.data.ops = self.scope.data.ops + 0.125
 		return function()
@@ -1215,8 +1325,10 @@ local CompileVisitors = {
 	end,
 
 	---@param data Token<string>
-	[NodeVariant.ExprIdent] = function (self, trace, data)
-		local var, name = self:Assert(self.scope:LookupVar(data.value), "Undefined variable (" .. data.value .. ")", trace), data.value
+	[NodeVariant.ExprIdent] = function(self, trace, data)
+		local var, name =
+			self:Assert(self.scope:LookupVar(data.value), "Undefined variable (" .. data.value .. ")", trace),
+			data.value
 		var.trace_if_unused = nil
 
 		self:AssertW(var.initialized, "Use of variable [" .. name .. "] before initialization", trace)
@@ -1229,22 +1341,23 @@ local CompileVisitors = {
 	end,
 
 	---@param data Token<string>
-	[NodeVariant.ExprConstant] = function (self, trace, data, used_as_stmt)
-		local value = self:Assert( wire_expression2_constants[data.value], "Invalid constant: " .. data.value, trace ).value
+	[NodeVariant.ExprConstant] = function(self, trace, data, used_as_stmt)
+		local value =
+			self:Assert(wire_expression2_constants[data.value], "Invalid constant: " .. data.value, trace).value
 
 		local ty = type(value)
 		if ty == "number" then
-			return self:CompileExpr( Node.new(NodeVariant.ExprLiteral, { "n", value }, trace) )
+			return self:CompileExpr(Node.new(NodeVariant.ExprLiteral, { "n", value }, trace))
 		elseif ty == "string" then
-			return self:CompileExpr( Node.new(NodeVariant.ExprLiteral, { "s", value }, trace) )
+			return self:CompileExpr(Node.new(NodeVariant.ExprLiteral, { "s", value }, trace))
 		elseif ty == "Vector" and wire_expression2_funcs["vec(nnn)"] then
 			return self:CompileExpr(Node.new(NodeVariant.ExprCall, {
 				Token.new(TokenVariant.String, "vec"),
 				{
 					Node.new(NodeVariant.ExprLiteral, { "n", value[1] }, trace),
 					Node.new(NodeVariant.ExprLiteral, { "n", value[2] }, trace),
-					Node.new(NodeVariant.ExprLiteral, { "n", value[3] }, trace)
-				}
+					Node.new(NodeVariant.ExprLiteral, { "n", value[3] }, trace),
+				},
 			}, trace))
 		elseif ty == "Angle" and wire_expression2_funcs["ang(nnn)"] then
 			return self:CompileExpr(Node.new(NodeVariant.ExprCall, {
@@ -1252,8 +1365,8 @@ local CompileVisitors = {
 				{
 					Node.new(NodeVariant.ExprLiteral, { "n", value[1] }, trace),
 					Node.new(NodeVariant.ExprLiteral, { "n", value[2] }, trace),
-					Node.new(NodeVariant.ExprLiteral, { "n", value[3] }, trace)
-				}
+					Node.new(NodeVariant.ExprLiteral, { "n", value[3] }, trace),
+				},
 			}, trace))
 		elseif ty == "table" then -- Know it's an array already from registerConstant
 			local out = {}
@@ -1269,8 +1382,8 @@ local CompileVisitors = {
 						{
 							Node.new(NodeVariant.ExprLiteral, { "n", val[1] }, trace),
 							Node.new(NodeVariant.ExprLiteral, { "n", val[2] }, trace),
-							Node.new(NodeVariant.ExprLiteral, { "n", val[3] }, trace)
-						}
+							Node.new(NodeVariant.ExprLiteral, { "n", val[3] }, trace),
+						},
 					}, trace)
 				elseif ty == "Angle" then
 					out[i] = Node.new(NodeVariant.ExprCall, {
@@ -1278,22 +1391,22 @@ local CompileVisitors = {
 						{
 							Node.new(NodeVariant.ExprLiteral, { "n", val[1] }, trace),
 							Node.new(NodeVariant.ExprLiteral, { "n", val[2] }, trace),
-							Node.new(NodeVariant.ExprLiteral, { "n", val[3] }, trace)
-						}
+							Node.new(NodeVariant.ExprLiteral, { "n", val[3] }, trace),
+						},
 					}, trace)
 				else
 					self:Error("Constant " .. data.value .. " has invalid data type", trace)
 				end
 			end
 
-			return self:CompileExpr( Node.new(NodeVariant.ExprArray, out, trace) )
+			return self:CompileExpr(Node.new(NodeVariant.ExprArray, out, trace))
 		else
 			self:Error("Constant " .. data.value .. " has invalid data type", trace)
 		end
 	end,
 
 	---@param data Node[]|{ [1]: Node, [2]:Node }[]
-	[NodeVariant.ExprArray] = function (self, trace, data)
+	[NodeVariant.ExprArray] = function(self, trace, data)
 		if #data == 0 then
 			return function()
 				return {}
@@ -1307,7 +1420,11 @@ local CompileVisitors = {
 
 				if key_ty == "n" then
 					local value, ty = self:CompileExpr(kvpair[2])
-					self:Assert(not BLOCKED_ARRAY_TYPES[ty], "Cannot use type " .. ty .. " as array value", kvpair[2].trace)
+					self:Assert(
+						not BLOCKED_ARRAY_TYPES[ty],
+						"Cannot use type " .. ty .. " as array value",
+						kvpair[2].trace
+					)
 					numbers[key] = value
 				else
 					self:Error("Cannot use type " .. key_ty .. " as array key", kvpair[1].trace)
@@ -1322,7 +1439,8 @@ local CompileVisitors = {
 				end
 
 				return array
-			end, "r"
+			end,
+				"r"
 		else
 			local args = {}
 			for k, arg in ipairs(data) do
@@ -1337,11 +1455,12 @@ local CompileVisitors = {
 					array[i] = val(state)
 				end
 				return array
-			end, "r"
+			end,
+				"r"
 		end
 	end,
 
-	[NodeVariant.ExprTable] = function (self, trace, data)
+	[NodeVariant.ExprTable] = function(self, trace, data)
 		if #data == 0 then
 			return function()
 				return { n = {}, ntypes = {}, s = {}, stypes = {}, size = 0 }
@@ -1381,7 +1500,8 @@ local CompileVisitors = {
 				end
 
 				return { s = s, stypes = stypes, n = n, ntypes = ntypes, size = size }
-			end, "t"
+			end,
+				"t"
 		else
 			---@cast data Node[]
 			local args, argtypes, len = {}, {}, #data
@@ -1395,7 +1515,8 @@ local CompileVisitors = {
 					array[i] = args[i](state)
 				end
 				return { n = array, ntypes = argtypes, s = {}, stypes = {}, size = len }
-			end, "t"
+			end,
+				"t"
 		end
 	end,
 
@@ -1408,10 +1529,23 @@ local CompileVisitors = {
 			scope.data["function"] = { "<anonymous>", fn }
 
 			for i, param in ipairs(data[1]) do
-				self:Assert(param.type, "Cannot omit parameter type for lambda, annotate with :<type>", param.name.trace)
-				param_names[i], param_types[i] = param.name.value, self:Assert(self:CheckType(param.type), "Cannot use void as parameter", param.name.trace)
-				self:Assert(not param.variadic, "Variadic lambdas are not supported, use an array instead", param.name.trace)
-				scope:DeclVar(param.name.value, { type = param_types[i], initialized = true, trace_if_unused = param.name.trace })
+				self:Assert(
+					param.type,
+					"Cannot omit parameter type for lambda, annotate with :<type>",
+					param.name.trace
+				)
+				param_names[i], param_types[i] =
+					param.name.value,
+					self:Assert(self:CheckType(param.type), "Cannot use void as parameter", param.name.trace)
+				self:Assert(
+					not param.variadic,
+					"Variadic lambdas are not supported, use an array instead",
+					param.name.trace
+				)
+				scope:DeclVar(
+					param.name.value,
+					{ type = param_types[i], initialized = true, trace_if_unused = param.name.trace }
+				)
 			end
 
 			local block = self:CompileStmt(data[2])
@@ -1434,31 +1568,28 @@ local CompileVisitors = {
 				inherited_scopes[i] = state.Scopes[i]
 			end
 
-			return E2Lib.Lambda.new(
-				expected_sig,
-				ret,
-				function(args)
-					local s_scopes, s_scope, s_scopeid = state.Scopes, state.Scope, state.ScopeID
+			return E2Lib.Lambda.new(expected_sig, ret, function(args)
+				local s_scopes, s_scope, s_scopeid = state.Scopes, state.Scope, state.ScopeID
 
-					local scope = { vclk = {} }
-					state.Scopes = inherited_scopes
-					state.ScopeID = after
-					state.Scopes[after] = scope
-					state.Scope = scope
+				local scope = { vclk = {} }
+				state.Scopes = inherited_scopes
+				state.ScopeID = after
+				state.Scopes[after] = scope
+				state.Scope = scope
 
-					for i = 1, nargs do
-						scope[param_names[i]] = args[i]
-					end
-
-					block(state)
-
-					state.ScopeID, state.Scope, state.Scopes = s_scopeid, s_scope, s_scopes
-
-					state.__return__ = false
-					return state.__returnval__
+				for i = 1, nargs do
+					scope[param_names[i]] = args[i]
 				end
-			)
-		end, "f"
+
+				block(state)
+
+				state.ScopeID, state.Scope, state.Scopes = s_scopeid, s_scope, s_scopes
+
+				state.__return__ = false
+				return state.__returnval__
+			end)
+		end,
+			"f"
 	end,
 
 	[NodeVariant.ExprArithmetic] = handleInfixOperation,
@@ -1479,11 +1610,13 @@ local CompileVisitors = {
 		if data[2] == Operator.Or then
 			return function(state)
 				return ((op_lhs(state, lhs(state)) ~= 0) or (op_rhs(state, rhs(state)) ~= 0)) and 1 or 0
-			end, "n"
+			end,
+				"n"
 		else -- Operator.And
 			return function(state)
 				return (op_lhs(state, lhs(state)) ~= 0 and op_rhs(state, rhs(state)) ~= 0) and 1 or 0
-			end, "n"
+			end,
+				"n"
 		end
 	end,
 
@@ -1558,33 +1691,40 @@ local CompileVisitors = {
 		self:AssertW(var.initialized, "Use of variable [" .. var_name .. "] before initialization", trace)
 
 		if data[1] == Operator.Dlt then -- $
-			self:Warning("Delta operator ($) is deprecated. Recommended to handle variable differences yourself.", trace)
+			self:Warning(
+				"Delta operator ($) is deprecated. Recommended to handle variable differences yourself.",
+				trace
+			)
 			self:Assert(var.depth == 0, "Delta operator ($) can not be used on temporary variables", trace)
 
 			local sub_op, sub_ty = self:GetOperator("sub", { var.type, var.type }, trace)
 			return function(state) ---@param state RuntimeContext
 				return sub_op(state, state.GlobalScope[var_name], state.GlobalScope["$" .. var_name])
-			end, sub_ty
+			end,
+				sub_ty
 		elseif data[1] == Operator.Trg then -- ~
 			return function(state) ---@param state RuntimeContext
 				return state.triggerinput == var_name and 1 or 0
-			end, "n"
+			end,
+				"n"
 		elseif data[1] == Operator.Imp then -- ->
 			if self.inputs[3][var_name] then
 				return function(state) ---@param state RuntimeContext
 					return IsValid(state.entity.Inputs[var_name].Src) and 1 or 0
-				end, "n"
+				end,
+					"n"
 			elseif self.outputs[3][var_name] then
 				return function(state) ---@param state RuntimeContext
 					local tbl = state.entity.Outputs[var_name].Connected
 					local ret = #tbl
 					for i = 1, ret do
-						if not IsValid(tbl[i].Entity)then
+						if not IsValid(tbl[i].Entity) then
 							ret = ret - 1
 						end
 					end
 					return ret
-				end, "n"
+				end,
+					"n"
 			else
 				self:Error("Can only use connected (->) operator on inputs or outputs", trace)
 			end
@@ -1592,7 +1732,7 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Node, [2]: Index[] }
-	[NodeVariant.ExprIndex] = function (self, trace, data)
+	[NodeVariant.ExprIndex] = function(self, trace, data)
 		local expr, expr_ty = self:CompileExpr(data[1])
 		for i, index in ipairs(data[2]) do
 			local key, key_ty = self:CompileExpr(index[1])
@@ -1615,11 +1755,19 @@ local CompileVisitors = {
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Node[] }
-	[NodeVariant.ExprCall] = function (self, trace, data, used_as_stmt)
+	[NodeVariant.ExprCall] = function(self, trace, data, used_as_stmt)
 		local name, args, types = data[1], {}, {}
 
-		if name.value == "changed" and data[2][1].variant == NodeVariant.ExprIdent and self.inputs[3][data[2][1].data.value] then
-			self:Warning("Use ~ instead of changed() for inputs", trace, { { replace = "~" .. data[2][1].data.value, at = trace } })
+		if
+			name.value == "changed"
+			and data[2][1].variant == NodeVariant.ExprIdent
+			and self.inputs[3][data[2][1].data.value]
+		then
+			self:Warning(
+				"Use ~ instead of changed() for inputs",
+				trace,
+				{ { replace = "~" .. data[2][1].data.value, at = trace } }
+			)
 		end
 
 		for k, arg in ipairs(data[2]) do
@@ -1627,15 +1775,25 @@ local CompileVisitors = {
 		end
 
 		local arg_sig = table.concat(types)
-		local fn_data = self:Assert(self:GetFunction(data[1].value, types), "No such function: " .. name.value .. "(" .. table.concat(types, ", ") .. ")", name.trace)
+		local fn_data = self:Assert(
+			self:GetFunction(data[1].value, types),
+			"No such function: " .. name.value .. "(" .. table.concat(types, ", ") .. ")",
+			name.trace
+		)
 
-		self:AssertW(not (used_as_stmt and fn_data.attrs.nodiscard), "The return value of this function cannot be discarded", trace)
+		self:AssertW(
+			not (used_as_stmt and fn_data.attrs.nodiscard),
+			"The return value of this function cannot be discarded",
+			trace
+		)
 
 		if fn_data.attrs["deprecated"] then
 			local value = fn_data.attrs["deprecated"]
-			self:Warning("Use of deprecated function (" .. name.value .. ") " .. (type(value) == "string" and value or ""), trace)
+			self:Warning(
+				"Use of deprecated function (" .. name.value .. ") " .. (type(value) == "string" and value or ""),
+				trace
+			)
 		end
-
 
 		if fn_data.attrs["noreturn"] then
 			self.scope.data.dead = true
@@ -1654,7 +1812,8 @@ local CompileVisitors = {
 						rargs[k] = args[k](state)
 					end
 					return fn(state, rargs, types)
-				end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+				end,
+					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			else
 				self.scope.data.ops = self.scope.data.ops + (fn_data.cost or 15) + (fn_data.attrs["legacy"] and 10 or 0)
 
@@ -1671,7 +1830,8 @@ local CompileVisitors = {
 					else
 						state:forceThrow("No such function defined at runtime: " .. full_sig)
 					end
-				end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+				end,
+					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			end
 		elseif fn_data.attrs["legacy"] then -- Not a user function. Can get function to call at compile time.
 			local fn, largs = fn_data.op, { [1] = {}, [nargs + 2] = types }
@@ -1680,7 +1840,8 @@ local CompileVisitors = {
 			end
 			return function(state) ---@param state RuntimeContext
 				return fn(state, largs)
-			end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+			end,
+				fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 		else
 			local fn = fn_data.op
 			return function(state) ---@param state RuntimeContext
@@ -1690,12 +1851,13 @@ local CompileVisitors = {
 				end
 
 				return fn(state, rargs, types)
-			end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+			end,
+				fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 		end
 	end,
 
 	---@param data { [1]: Node, [2]: Token<string>, [3]: Node[] }
-	[NodeVariant.ExprMethodCall] = function (self, trace, data, used_as_stmt)
+	[NodeVariant.ExprMethodCall] = function(self, trace, data, used_as_stmt)
 		local name, args, types = data[2], {}, {}
 		for k, arg in ipairs(data[3]) do
 			args[k], types[k] = self:CompileExpr(arg)
@@ -1704,17 +1866,30 @@ local CompileVisitors = {
 		local arg_sig = table.concat(types)
 		local meta, meta_type = self:CompileExpr(data[1])
 
-		local fn_data = self:Assert(self:GetFunction(name.value, types, meta_type), "No such method: " .. (meta_type or "void") .. ":" .. name.value .. "(" .. table.concat(types, ", ") .. ")", name.trace)
+		local fn_data = self:Assert(
+			self:GetFunction(name.value, types, meta_type),
+			"No such method: " .. (meta_type or "void") .. ":" .. name.value .. "(" .. table.concat(types, ", ") .. ")",
+			name.trace
+		)
 
-		self:AssertW(not (used_as_stmt and fn_data.attrs.nodiscard), "The return value of this function cannot be discarded", trace)
+		self:AssertW(
+			not (used_as_stmt and fn_data.attrs.nodiscard),
+			"The return value of this function cannot be discarded",
+			trace
+		)
 
 		if fn_data.attrs["deprecated"] then
 			local value = fn_data.attrs["deprecated"]
-			self:Warning("Use of deprecated function (" .. name.value .. ") " .. (type(value) == "string" and value or ""), trace)
+			self:Warning(
+				"Use of deprecated function (" .. name.value .. ") " .. (type(value) == "string" and value or ""),
+				trace
+			)
 		end
 
 		local nargs = #args
-		local user_method = self.user_methods[meta_type] and self.user_methods[meta_type][name.value] and self.user_methods[meta_type][name.value][arg_sig]
+		local user_method = self.user_methods[meta_type]
+			and self.user_methods[meta_type][name.value]
+			and self.user_methods[meta_type][name.value][arg_sig]
 		if user_method then
 			if self.strict then -- If @strict, functions are compile time constructs (like events).
 				local fn = user_method.op
@@ -1724,7 +1899,8 @@ local CompileVisitors = {
 						rargs[k + 1] = args[k](state)
 					end
 					return fn(state, rargs, types)
-				end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+				end,
+					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			else
 				local full_sig = name.value .. "(" .. meta_type .. ":" .. arg_sig .. ")"
 				return function(state) ---@param state RuntimeContext
@@ -1739,7 +1915,8 @@ local CompileVisitors = {
 					else
 						state:forceThrow("No such method defined at runtime: " .. full_sig)
 					end
-				end, fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
+				end,
+					fn_data.ret and (fn_data.ret ~= "" and fn_data.ret or nil)
 			end
 		elseif fn_data.attrs["legacy"] then
 			local fn, largs = fn_data.op, { [nargs + 3] = types, [2] = { [1] = meta } }
@@ -1759,12 +1936,13 @@ local CompileVisitors = {
 				end
 
 				return fn(state, rargs, types)
-			end, fn_data.ret
+			end,
+				fn_data.ret
 		end
 	end,
 
 	---@param data { [1]: Node, [2]: Node[], [3]: Token<string>? }
-	[NodeVariant.ExprDynCall] = function (self, trace, data)
+	[NodeVariant.ExprDynCall] = function(self, trace, data)
 		local expr, expr_ty = self:CompileExpr(data[1])
 
 		local args, arg_types = {}, {}
@@ -1775,12 +1953,17 @@ local CompileVisitors = {
 		local ret_type = data[3] and self:CheckType(data[3])
 
 		if expr_ty == "s" then
-			self:Warning("String calls are deprecated. Use lambdas instead. This will be an error on @strict in the future.", trace)
+			self:Warning(
+				"String calls are deprecated. Use lambdas instead. This will be an error on @strict in the future.",
+				trace
+			)
 			self.scope.data.ops = self.scope.data.ops + 25
 
 			local type_sig = table.concat(arg_types)
 			local arg_sig = "(" .. type_sig .. ")"
-			local meta_arg_sig = #arg_types >= 1 and ("(" .. arg_types[1] .. ":" .. table.concat(arg_types, "", 2) .. ")") or "()"
+			local meta_arg_sig = #arg_types >= 1
+					and ("(" .. arg_types[1] .. ":" .. table.concat(arg_types, "", 2) .. ")")
+				or "()"
 
 			local nargs = #args
 			return function(state) ---@param state RuntimeContext
@@ -1796,7 +1979,9 @@ local CompileVisitors = {
 				if fn then -- first check if user defined any functions that match signature
 					local r = state.funcs_ret[sig] or state.funcs_ret[meta_sig]
 					if r ~= ret_type then
-						state:forceThrow( "Mismatching return types. Got " .. (r or "void") .. ", expected " .. (ret_type or "void"))
+						state:forceThrow(
+							"Mismatching return types. Got " .. (r or "void") .. ", expected " .. (ret_type or "void")
+						)
 					end
 
 					return fn(state, rargs, arg_types)
@@ -1805,13 +1990,22 @@ local CompileVisitors = {
 					if fn then
 						local r = fn[2]
 						if r ~= ret_type and not (ret_type == nil and r == "") then
-							state:forceThrow( "Mismatching return types. Got " .. (r or "void") .. ", expected " .. (ret_type or "void"))
+							state:forceThrow(
+								"Mismatching return types. Got "
+									.. (r or "void")
+									.. ", expected "
+									.. (ret_type or "void")
+							)
 						end
 
 						if fn.attributes.legacy then
 							local largs = { [1] = {}, [nargs + 2] = arg_types }
 							for i = 1, nargs do
-								largs[i + 1] = { [1] = function() return rargs[i] end }
+								largs[i + 1] = {
+									[1] = function()
+										return rargs[i]
+									end,
+								}
 							end
 							return fn[3](state, largs, arg_types)
 						else
@@ -1824,13 +2018,22 @@ local CompileVisitors = {
 							if fn then
 								local r = fn[2]
 								if r ~= ret_type and not (ret_type == nil and r == "") then
-									state:forceThrow("Mismatching return types. Got " .. (r or "void") .. ", expected " .. (ret_type or "void"))
+									state:forceThrow(
+										"Mismatching return types. Got "
+											.. (r or "void")
+											.. ", expected "
+											.. (ret_type or "void")
+									)
 								end
 
 								if fn.attributes.legacy then
 									local largs = { [1] = {}, [nargs + 2] = arg_types }
 									for i = 1, nargs do
-										largs[i + 1] = { [1] = function() return rargs[i] end }
+										largs[i + 1] = {
+											[1] = function()
+												return rargs[i]
+											end,
+										}
 									end
 									return fn[3](state, largs, arg_types)
 								elseif varsig == "array(...)" then -- Need this since can't enforce compile time argument type restrictions on string calls. Woop. Array creation should not be a function..
@@ -1840,7 +2043,13 @@ local CompileVisitors = {
 										if BLOCKED_ARRAY_TYPES[ty] then
 											table.remove(rargs, i)
 											table.remove(arg_types, i)
-											state:forceThrow("Cannot use type " .. ty .. " for argument #" .. i .. " in stringcall array creation")
+											state:forceThrow(
+												"Cannot use type "
+													.. ty
+													.. " for argument #"
+													.. i
+													.. " in stringcall array creation"
+											)
 										else
 											i = i + 1
 										end
@@ -1873,7 +2082,8 @@ local CompileVisitors = {
 						state:forceThrow("No such function: " .. fn_name .. arg_sig)
 					end
 				end
-			end, ret_type
+			end,
+				ret_type
 		elseif expr_ty == "f" then
 			self.scope.data.ops = self.scope.data.ops + 15 -- Since functions are 10 ops, this is pretty lenient. I will decrease this slightly when functions are made static and cheaper.
 
@@ -1885,9 +2095,13 @@ local CompileVisitors = {
 				local f = expr(state)
 
 				if f.arg_sig ~= sig then
-					state:forceThrow("Incorrect arguments passed to lambda, expected (" .. f.arg_sig .. ") got (" .. sig .. ")")
+					state:forceThrow(
+						"Incorrect arguments passed to lambda, expected (" .. f.arg_sig .. ") got (" .. sig .. ")"
+					)
 				elseif f.ret ~= ret_type then
-					state:forceThrow("Expected type " .. (ret_type or "void") .. " from lambda, got " .. (f.ret or "void"))
+					state:forceThrow(
+						"Expected type " .. (ret_type or "void") .. " from lambda, got " .. (f.ret or "void")
+					)
 				else
 					local rargs = {}
 					for k = 1, nargs do
@@ -1895,22 +2109,31 @@ local CompileVisitors = {
 					end
 					return f.fn(rargs)
 				end
-			end, ret_type
+			end,
+				ret_type
 		else
 			self:Error("Cannot call type of " .. expr_ty, trace)
 		end
 	end,
 
 	---@param data { [1]: Token<string>, [2]: Parameter[], [3]: Node }
-	[NodeVariant.Event] = function (self, trace, data)
-		self:AssertW(self.scope:IsGlobalScope() or (self.include and self.scope:Depth() == 1), "Events cannot be nested inside of statements, they are compile time constructs. This will become a hard error in the future!", trace)
+	[NodeVariant.Event] = function(self, trace, data)
+		self:AssertW(
+			self.scope:IsGlobalScope() or (self.include and self.scope:Depth() == 1),
+			"Events cannot be nested inside of statements, they are compile time constructs. This will become a hard error in the future!",
+			trace
+		)
 
 		---@type string, { [1]: string, [2]: string }[]
 		local name, params = data[1].value, {}
 		for i, param in ipairs(data[2]) do
 			local type = param.type and self:CheckType(param.type)
 			if not type then
-				self:Warning("Use of implicit parameter type is deprecated", param.name.trace, { { replace = param.name.value .. ":number", at = param.name.trace } })
+				self:Warning(
+					"Use of implicit parameter type is deprecated",
+					param.name.trace,
+					{ { replace = param.name.value .. ":number", at = param.name.trace } }
+				)
 				type = "n"
 			end
 			params[i] = { param.name.value, type }
@@ -1924,7 +2147,10 @@ local CompileVisitors = {
 				extra_arg_types[#extra_arg_types + 1] = params[i][2]
 			end
 
-			self:Error("Event '" .. name .. "' does not take arguments (" .. table.concat(extra_arg_types, ", ") .. ")", trace)
+			self:Error(
+				"Event '" .. name .. "' does not take arguments (" .. table.concat(extra_arg_types, ", ") .. ")",
+				trace
+			)
 		end
 
 		for k, arg in ipairs(event.args) do
@@ -1938,7 +2164,7 @@ local CompileVisitors = {
 			end
 		end
 
-		if (self.registered_events[name] and self.registered_events[name][self.include or "__main__"]) then
+		if self.registered_events[name] and self.registered_events[name][self.include or "__main__"] then
 			self:Error("You can only register one event callback per file", trace)
 		end
 
@@ -1970,7 +2196,7 @@ local CompileVisitors = {
 		end
 
 		return nil
-	end
+	end,
 }
 
 ---@alias TypeSignature string
@@ -2009,15 +2235,21 @@ function Compiler:GetUserFunction(name, types, method)
 	local overloads
 	if method then
 		overloads = self.user_methods[method]
-		if not overloads then return end
+		if not overloads then
+			return
+		end
 		overloads = overloads[name]
 	else
 		overloads = self.user_functions[name]
 	end
-	if not overloads then return end
+	if not overloads then
+		return
+	end
 
 	local param_sig = table.concat(types)
-	if overloads[param_sig] then return overloads[param_sig], false end
+	if overloads[param_sig] then
+		return overloads[param_sig], false
+	end
 
 	for i = #types, 0, -1 do
 		local sig = table.concat(types, "", 1, i)
@@ -2026,14 +2258,23 @@ function Compiler:GetUserFunction(name, types, method)
 		if fn then
 			for j = i, #types do
 				if BLOCKED_ARRAY_TYPES[types[j]] then
-					self:Error("Cannot call variadic array function (" .. name .. ") with a " .. tostring(types[j]) .. " value.", trace)
+					self:Error(
+						"Cannot call variadic array function ("
+							.. name
+							.. ") with a "
+							.. tostring(types[j])
+							.. " value.",
+						trace
+					)
 				end
 			end
 			return fn, true
 		end
 
 		fn = overloads[sig .. "..t"]
-		if fn then return fn, true end
+		if fn then
+			return fn, true
+		end
 	end
 end
 
@@ -2047,18 +2288,26 @@ function Compiler:GetFunction(name, types, method)
 	local sig, method_prefix = table.concat(types), method and (method .. ":") or ""
 
 	local fn = wire_expression2_funcs[name .. "(" .. method_prefix .. sig .. ")"]
-	if fn then return { op = fn[3], ret = fn[2], args = types, cost = fn[4], attrs = fn.attributes }, false, false end
+	if fn then
+		return { op = fn[3], ret = fn[2], args = types, cost = fn[4], attrs = fn.attributes }, false, false
+	end
 
 	local fn, variadic = self:GetUserFunction(name, types, method)
-	if fn then return fn, variadic, true end
+	if fn then
+		return fn, variadic, true
+	end
 
 	for i = #sig, 0, -1 do
 		fn = wire_expression2_funcs[name .. "(" .. method_prefix .. sig:sub(1, i) .. "...)"]
-		if fn then return { op = fn[3], ret = fn[2], args = types, cost = fn[4], attrs = fn.attributes }, true, false end
+		if fn then
+			return { op = fn[3], ret = fn[2], args = types, cost = fn[4], attrs = fn.attributes }, true, false
+		end
 	end
 end
 
-function Compiler:CompileExpr(node --[[@param node Node]]) ---@return RuntimeOperator, string
+function Compiler:CompileExpr(
+	node --[[@param node Node]]
+) ---@return RuntimeOperator, string
 	local op, ty = CompileVisitors[node.variant](self, node.trace, node.data, false) ---@cast op -nil # Expressions should never return nil function
 
 	if ty == nil then
@@ -2072,7 +2321,9 @@ function Compiler:CompileExpr(node --[[@param node Node]]) ---@return RuntimeOpe
 	return op, ty
 end
 
-function Compiler:CompileStmt(node --[[@param node Node]])
+function Compiler:CompileStmt(
+	node --[[@param node Node]]
+)
 	return CompileVisitors[node.variant](self, node.trace, node.data, true)
 end
 
