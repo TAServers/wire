@@ -902,6 +902,9 @@ for funcname, _ in pairs(makeglobal) do
 	_G[funcname] = E2Lib[funcname]
 end
 
+local PLAYER_METATABLE = FindMetaTable("Player")
+local ENTITY_METATABLE = FindMetaTable("Entity")
+
 hook.Add("InitPostEntity", "e2lib", function()
 -- If changed, put them into the global scope again.
 	registerCallback("e2lib_replace_function", function(funcname, func, oldfunc)
@@ -915,7 +918,7 @@ hook.Add("InitPostEntity", "e2lib", function()
 
 	-- check for a CPPI compliant plugin
 	if SERVER and CPPI then
-		if debug.getregistry().Player.CPPIGetFriends then
+		if PLAYER_METATABLE.CPPIGetFriends then
 			E2Lib.replace_function("isFriend", function(owner, player)
 				if owner == nil then return false end
 				if owner == player then return true end
@@ -934,7 +937,7 @@ hook.Add("InitPostEntity", "e2lib", function()
 			end)
 		end
 
-		if debug.getregistry().Entity.CPPIGetOwner then
+		if ENTITY_METATABLE.CPPIGetOwner then
 			local _getOwner = E2Lib.getOwner
 			E2Lib.replace_function("getOwner", function(self, entity)
 				if not IsValid(entity) then return end

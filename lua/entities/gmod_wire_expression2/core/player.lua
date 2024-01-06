@@ -509,9 +509,11 @@ end
 
 --------------------------------------------------------------------------------
 
+local PLAYER_METATABLE = FindMetaTable("Player")
+
 __e2setcost(2)
 
-if CPPI and debug.getregistry().Player.CPPIGetFriends then
+if CPPI and PLAYER_METATABLE.CPPIGetFriends then
 
 	local function Trusts(ply, whom)
 		if ply == whom then return true end
